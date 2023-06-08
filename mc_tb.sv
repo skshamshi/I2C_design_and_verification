@@ -33,7 +33,7 @@ module memorycontroller_tb;
   
   // Test scenario
   initial begin
-    data = 8'b11111111;
+    data = 8'b10101010;
     // Perform memory write operation
     #10 scl = 1;
     #10 slavesda = 0;
