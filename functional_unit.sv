@@ -18,7 +18,7 @@ genvar i;
 generate
 	for(i = 1; i < N-1; i++)
 	begin
-		assign Temp[i] = {data_out[i-1],data_out[i+1],data_out[i-1],data_out[i+1],data_out[i-1],data_out[i+1],data_in[i],data_out[i]};
+		assign Temp[i] = {data_out[i-1], data_out[i+1], data_out[i-1], data_out[i+1], data_out[i-1], data_out[i+1], data_in[i], data_out[i]};
 	end
 endgenerate
 	
