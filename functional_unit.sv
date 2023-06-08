@@ -1,9 +1,9 @@
-module FunctionalUnit(Q, Clock, Clear, D, S, MSBIn, LSBIn);
+module FunctionalUnit(data_out, clk, rst, data_in, S, MSBIn, LSBIn);
 parameter N = 8;
-output logic[N-1:0] Q;
-input logic Clock;
-input logic Clear;
-input logic [N-1:0] D;
+output logic[N-1:0] data_out;
+input logic clk;
+input logic rst;
+input logic [N-1:0] data_in;
 input logic [$clog2(N)-1:0] S;
 input logic MSBIn;
 input logic LSBIn;
@@ -11,32 +11,32 @@ input logic LSBIn;
 logic [N-1:0]Y;
 logic [7:0] Temp [N-1:0];
 
-assign Temp[0] = {1'b0, Q[1], Q[N-1], Q[1], LSBIn, Q[1], D[0], Q[0]};
-assign Temp[N-1] = {Q[N-2], Q[N-1], Q[N-2], Q[0], Q[N-2], MSBIn, D[N-1], Q[N-1]};
+assign Temp[0] = {1'b0, data_out[1], data_out[N-1], data_out[1], LSBIn, data_out[1], data_in[0], data_out[0]};
+assign Temp[N-1] = {data_out[N-2], data_out[N-1], data_out[N-2], data_out[0], data_out[N-2], MSBIn, data_in[N-1], data_out[N-1]};
 
 genvar i;
 generate
 	for(i = 1; i < N-1; i++)
 	begin
-		assign Temp[i] = {Q[i-1],Q[i+1],Q[i-1],Q[i+1],Q[i-1],Q[i+1],D[i],Q[i]};
+		assign Temp[i] = {data_out[i-1],data_out[i+1],data_out[i-1],data_out[i+1],data_out[i-1],data_out[i+1],data_in[i],data_out[i]};
 	end
 endgenerate
 	
 Mux DUT1 [N-1:0](Y, Temp, S);
-DFF DUT2 [N-1:0] (Q, Clock, Clear, Y);
+DFF DUT2 [N-1:0] (data_out, clk, rst, Y);
 
 endmodule
 
-module DFF(Q, Clock, Clear, D);
-output logic Q;
-input logic Clock,Clear, D;
+module DFF(data_out, clk, rst, data_in);
+output logic data_out;
+input logic clk, rst, data_in;
 
-always_ff@(posedge Clock, negedge Clear)
+always_ff@(posedge clk)
 	begin
-		if(~Clear)
-			Q <= 1'b0;
+		if(rst)
+			data_out <= 1'b0;
 		else
-		 	Q <= D;		
+		 	data_out <= data_in;		
 	end
 endmodule 
 
