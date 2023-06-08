@@ -1,25 +1,30 @@
-parameter DATAWIDTH=8;
-parameter ADDRWIDTH=7;
-
+parameter SLAVE_SIZE=8;
+parameter SLAVE_ADDR=7'b1001100;
 module i2cinterface1(
-memorysubsystem inst, 
-input logic [6:0]master_addr, 
-input logic [DATAWIDTH-1:0]data_in,
-input logic [ADDRWIDTH-1:0]addr
+                      memorysubsystem inst
+                      
 );
 
+int count=0;
+int i;
+logic [SLAVE_SIZE-2:0] slave_addr;
 
-int count=8;
-logic [6:0] slave_addr;
-// logic [7:0] data_out;
-logic ack;
-logic write;
-logic read;
+//logic write;
+// logic read;
+// logic [inst.DATAWIDTH-1:0]data_out;
+logic sdat;
+logic sda_en=0;
+logic sclclk=0;
+logic sclt;
+logic [7:0] sdaValues[$];
+logic [7:0] data_output[$];
 
+logic [inst.ADDRWIDTH-1:0]addrreg;
+logic [inst.DATAWIDTH-1:0]data_out;
 
 enum{idle_bit=0,
      start_bit=1,
-     addr_bit=2
+     addr_bit=2,
      rw_bit=3,
      ack1_bit=4,
      data_bit=5,
@@ -37,123 +42,192 @@ enum logic [7:0] {
                   stop_state=8'b00000001<<stop_bit
                   }state,nextstate;
 
-always_ff@(posedge inst.clk or negedge inst.rst)
-begin
- if(!inst.rst) state<=idle_state;
- else state<=nextstate;
-end
 
-always_comb
+assign slave_addr=SLAVE_ADDR;
+
+
+always@(posedge inst.clk)
+    begin
+      if(count <= 9) 
+        begin
+           count <= count + 1;     
+        end
+      else
+         begin
+           count     <= 0; 
+		   sclclk=~sclclk;
+         end	      
+    end
+
+always_ff@(posedge sclclk or negedge inst.rst)
 begin
- nextstate=state;
+ if(!inst.rst) 
+ begin
+      state<=idle_state;
+	  sclt<=1;
+      sdat<=1;
+ end
+ else begin 
  unique case(1'b1)
     state[idle_bit]:
 	begin
-	 if(inst.enable) nextstate=start_state;
-	 else nextstate=idle_state;
+	 sclt<=1;
+     sdat<=1;
+	 sda_en  <= 1'b1;
+	 if(inst.enable) 
+	        nextstate<=start_state;
+	 else 
+	        nextstate<=idle_state;
     end
-	state[start_bit]:nextstate=addr_state;
+	state[start_bit]:
+	begin
+	    sdat<=0;
+        sclt<=1;
+	    if(inst.enable)
+	          nextstate<=addr_state;
+		else
+		      nextstate<=idle_state;
+	end
 	state[addr_bit]: 
 	begin
-	 if ((master_addr == slave_addr) && (count==0)) 
-	   nextstate = rw_state;
-	 else if((count!=0) && (master_addr ==slave_addr))
-	   nextstate =addr_state;
+	  sclt<=~sclt;
+	  
+	 if ((SLAVE_ADDR == slave_addr) && (count==0)) begin
+	   nextstate <= rw_state;
+	   inst.ack<='0;
+	  end
+	 else if((count!=0) && (SLAVE_ADDR ==slave_addr))begin
+	   nextstate <=addr_state;
+	   if(i<=7)begin
+             sdat<=slave_addr[i];
+             sdat<=inst.addr[i];
+			 i<=i+1;
+        end
+	  end
 	 else
-	   nextstate=idle_state;
+	   nextstate<=idle_state;
+	   
 	end
-	state[rw_bit]: nextstate=ack1_state;
-	state[ack1_bit]: nextstate=data_state;
+	state[rw_bit]: begin
+	nextstate<=ack1_state;
+	sclt<=~sclt;
+	if(slave_addr[SLAVE_SIZE]==0) 
+            begin
+              sdat<=slave_addr[SLAVE_SIZE];
+              inst.write<=1;
+              inst.read<=0;
+            end
+            else 
+			begin
+              sdat<=slave_addr[SLAVE_SIZE];
+              inst.read<=1;
+              inst.write<=0;
+            end
+	end
+	state[ack1_bit]: begin
+	nextstate<=data_state;
+	inst.ack=1;
+    sclt<=~sclt;
+    sdat<=1;
+	end
 	state[data_bit]: 
 	begin
-	 if(count==0)
-	   nextstate=ack2_state;
+	 sclt<=~sclt;
+	 if(i<=0)
+	   nextstate<=ack2_state;
 	 else
-	   nextstate=data_state;
+	   nextstate<=data_state;
+	   if(inst.write && (!inst.read))
+            begin
+               if(i<=7) begin
+                sdat<=inst.data_in[i];
+				data_out<=inst.data_in;
+				i<=i+1;
+			end
+        end
 	end
-	state[ack2_bit]: nextstate=stop_state;
-	state[stop_bit]: nextstate=idle_state;
+	state[ack2_bit]: begin
+	nextstate<=stop_state;
+	inst.ack<=1;
+    sdat<=1;
+    sclt<=~sclt;
+	end
+	state[stop_bit]: begin
+	nextstate<=idle_state;
+	sdat<=0;
+    sclt<=1;
+	end
+// default: state<=nextstate;
  endcase
 end
-always_comb
-begin
-// data_out='0;
-inst.mastersda=1;
-inst.scl=1;
-unique case(1'b1)
-state[idle_bit]:
-begin
-inst.scl=1;
-inst.mastersda=1;
-count=8;
-end
-state[start_bit]:
-begin
-inst.mastersda=0;
-inst.scl=1;
-end
-state[addr_bit]:
-begin
-inst.scl=~inst.scl;
-//inst.mastersda=1;
-if(count!=0)begin
-for(int i=0;i<count;i++)
-  inst.mastersda=master_addr[count-1];
- // for(int i=0;i<count;i++)
- // slave_addr[i]=master_addr[count-i];
- count=count-1;
-end
-if(count==0)
-ack=1;
-end
-state[rw_bit]:
-begin
-inst.scl=~inst.scl;
-if(addr[7]==0) 
-begin
-inst.mastersda=0;
-write=1;
-read=0;
-end
-else begin
-inst.mastersda=1;
-read=1;
-write=0;
-end
-end
-state[ack1_bit]:
-begin
-ack=1;
-inst.scl=~inst.scl;
-inst.mastersda=1;
-end
-state[data_bit]:
-begin
-//inst.mastersda=1;
-inst.scl=~inst.scl;
-if(write && (!read))
-begin
-for(int j=8;j>count;j--)
-inst.mastersda=data_in[j-1];
-// for(int j=8;j>count;j--)
-// data_out[j-count]=data_in[count];
-
 end
 
-end
-state[ack2_bit]:
-begin
-ack=1;
-inst.mastersda=1;
-inst.scl=~inst.scl;
-end
-state[stop_bit]:
-begin
-inst.mastersda=0;
-inst.scl=1;
-end
-endcase
-end
+assign inst.mastersda=(sda_en==1'b0) ? sdat :1'bz;
+assign inst.scl=((state==start_state)||(state==stop_state)) ? sclt : sclclk;
+
+//Assertions of i2c-interface
+//assertions to check for reset state
+property p_resetstate;
+  @(posedge inst.clk)
+    (!inst.rst) |=> (state==idle_state);
+endproperty
+  a_check_reset_state: assert property (p_resetstate) else $error(" error at this assertion p_reset_state");
+// assertion for checking idle state
+property p_idle_state;
+ @(posedge inst.clk)
+   ((inst.enable) &&(state==idle_state)) |=> ((state==start_state) ||(state==idle_state));
+endproperty
+  a_check_idle_state: assert property (p_idle_state) else $error(" error at this assertion p_idle_state");
+// assertion for checking start state
+property p_start_state;
+ @(posedge inst.clk)
+   ((inst.enable) &&(state==start_state)) |=> ((state==addr_state) ||(state==idle_state));
+endproperty
+  a_check_start_state: assert property (p_start_state) else $error(" error at this assertion p_start_state");
+ // assertion for checking addr_state
+property p_addr_state;
+ @(posedge inst.clk)
+   (((SLAVE_ADDR == slave_addr) && (count==0)) &&(state==addr_state)) |=> (state==rw_state);
+ endproperty
+   a_check_addr_state: assert property (p_addr_state) else $error(" error at this assertion p_addr_state");
+// assertion for checking addr_nextstate
+property p_addr_nextstate;
+  @(posedge inst.clk)
+    (((SLAVE_ADDR == slave_addr) && (count!=0)) && (state==addr_state)) |=> ((state==addr_state) ||(state==idle_state));
+endproperty
+  a_check_addrnextstate: assert property (p_addr_nextstate) else $error ("error at this assertion p_addr_nextstate");
+//assertion for checking read_write state
+property p_read_write_state;
+  @(posedge inst.clk)
+   (state==rw_state) |=> (state==ack1_state);
+endproperty
+  a_check_rwstate: assert property (p_read_write_state) else $error(" error at this assertion p_read_write_state");
+// assertion for checking ack1_state
+property p_ack1_state;
+ @(posedge inst.clk)
+  (state==ack1_state) |=>(state==data_state);
+endproperty
+   a_check_ack1_state: assert property (p_ack1_state) else $error(" error at this assertion p_ack1_state");
+// assertion for checking data state
+property p_data_state;
+ @(posedge inst.clk)
+    ((count==0) && (state==data_state)) |=> ((state==data_state) ||(state==ack2_state));
+endproperty
+   a_check_data_state: assert property (p_data_state) else $error(" error at this assertion p_data_state");
+// assertion for checking outputs in idle state
+property p_idle_outputs;
+  @(posedge inst.clk)
+    (state==idle_state) |-> ((sdat==1) &&(sclt==1));
+endproperty
+  a_check_idle_outputs: assert property (p_idle_outputs) else $error(" error occured at this assertion p_idle_outputs");
+// assertion for checking outputs in start state
+property p_start_outputs;
+  @(posedge inst.clk)
+   (state==start_state) |-> ((inst.mastersda==0) &&(inst.scl==1));
+endproperty
+  a_check_start_outputs: assert property (p_start_outputs) else $error("error occured at this assertion p_start_outputs");
+
+
 endmodule : i2cinterface1
 
 
