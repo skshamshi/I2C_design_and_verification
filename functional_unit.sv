@@ -1,46 +1,42 @@
-module FunctionalUnit(data_out, clk, rst, data_in, S, MSBIn, LSBIn);
 parameter N = 8;
-output logic[N-1:0] data_out;
-input logic clk;
-input logic rst;
-input logic [N-1:0] data_in;
-input logic [$clog2(N)-1:0] S;
-input logic MSBIn;
-input logic LSBIn;
+module FunctionalUnit(
+	memorysubsystem instf,
+	output logic[N-1:0] Q,
+	input logic [N-1:0] D,
+	input logic [$clog2(N)-1:0] S,
+	input logic MSBIn,
+	input logic LSBIn);
 
-logic [N-1:0]Y;
-logic [7:0] Temp [N-1:0];
-
-assign Temp[0] = {1'b0, data_out[1], data_out[N-1], data_out[1], LSBIn, data_out[1], data_in[0], data_out[0]};
-assign Temp[N-1] = {data_out[N-2], data_out[N-1], data_out[N-2], data_out[0], data_out[N-2], MSBIn, data_in[N-1], data_out[N-1]};
+	logic [N-1:0]temp;
+	logic [7:0] M [N-1:0];
 
 genvar i;
 generate
-	for(i = 1; i < N-1; i++)
-	begin
-		assign Temp[i] = {data_out[i-1], data_out[i+1], data_out[i-1], data_out[i+1], data_out[i-1], data_out[i+1], data_in[i], data_out[i]};
-	end
+for (i = N-1; i >= 0; i--)
+assign M[i] = { (i == 0) ? 1'b0 : Q[i-1],(i == N-1) ? Q[N-1] : Q[i+1],(i == 0) ? Q[N-1] : Q[i-1],(i == N-1) ? Q[0] : Q[i+1],(i == 0)? LSBIn : Q[i-1],(i == N-1) ? MSBIn  : Q[i+1],D[i],Q[i]};	
 endgenerate
 	
-Mux DUT1 [N-1:0](Y, Temp, S);
-DFF DUT2 [N-1:0] (data_out, clk, rst, Y);
+	Mux DUT1 [N-1:0](M, S, temp);
+	DFF DUT2 [N-1:0] (bus.func, instf.rst, temp, enable,Q);
 
 endmodule
 
-module DFF(data_out, clk, rst, data_in);
-output logic data_out;
-input logic clk, rst, data_in;
+module DFF(memorysubsystem instf, 
+input logic D,
+input logic enable,
+output logic Q
+);
 
-always_ff@(posedge clk)
+	always_ff@(posedge instf.clk or negedge instf.rst )
 	begin
-		if(rst)
-			data_out <= 1'b0;
+		if(~instf.rst)
+			Q <= 1'b0;
 		else
-		 	data_out <= data_in;		
+		 	Q <= D;		
 	end
 endmodule 
 
-module Mux(Y, V, S);
+module Mux(V, S, Y);
 parameter N = 8;
 output logic Y;
 input logic [N-1:0] V;
