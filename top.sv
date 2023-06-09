@@ -26,7 +26,7 @@ enum{idle_bit=0,
      ack1_bit=4,
      data_bit=5,
      ack2_bit=6,
-     stop_bit=7}state_bit;
+     stop_bit=7}stAte_bit;
 
 enum logic [7:0] {
                   idle_state=8'b00000001<<idle_bit,
