@@ -94,7 +94,7 @@ begin
 	  
 	 if ((SLAVE_ADDR == slave_addr) && (count==0)) begin
 	   nextstate <= rw_state;
-	   inst.ack<='0;
+	   // inst.ack<='0;
 	  end
 	 else if((count!=0) && (SLAVE_ADDR ==slave_addr))begin
 	   nextstate <=addr_state;
@@ -126,7 +126,7 @@ begin
 	end
 	state[ack1_bit]: begin
 	nextstate<=data_state;
-	inst.ack=1;
+	// inst.ack=1;
     sclt<=~sclt;
     sdat<=1;
 	end
@@ -148,7 +148,7 @@ begin
 	end
 	state[ack2_bit]: begin
 	nextstate<=stop_state;
-	inst.ack<=1;
+	// inst.ack<=1;
     sdat<=1;
     sclt<=~sclt;
 	end
@@ -223,7 +223,7 @@ endproperty
 // assertion for checking outputs in start state
 property p_start_outputs;
   @(posedge inst.clk)
-   (state==start_state) |-> ((inst.mastersda==0) &&(inst.scl==1));
+   (state==start_state) |-> ((sdat==0) &&(sclt==1));
 endproperty
   a_check_start_outputs: assert property (p_start_outputs) else $error("error occured at this assertion p_start_outputs");
 

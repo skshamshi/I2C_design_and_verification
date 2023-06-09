@@ -14,7 +14,7 @@ module memorycontroller_tb;
  // Instantiate the I2CInterface module
     memorysubsystem bus (clk,rst);
     //i2cinterface1 i2c1(bus.i2c_master);
-    memorycontroller mc1(bus.mc_slave,dataout);
+    memorycontroller mc1(bus.mc_slave,data_out);
   
   // Clock generation
   always begin
@@ -34,7 +34,7 @@ module memorycontroller_tb;
   
   // Test scenario
   initial begin
-    data = 8'b11111111;
+    data_in = 8'b11111111;
     // Perform memory write operation
     @(negedge clk) scl = 1;
     @(negedge clk) slavesda = 0;
@@ -80,9 +80,9 @@ module memorycontroller_tb;
     @(negedge clk) slavesda = 1;
     
     // Wait for the acknowledgement
-    @(negedge clk)0;
+    @(negedge clk);
     
-    $display("ACK: %b OUT : %b", ack,dataout);
+    $display("ACK: %b OUT : %b", ack,data_out);
     
     $finish; // End the simulation
   end

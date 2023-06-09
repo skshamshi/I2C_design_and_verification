@@ -1,7 +1,6 @@
 parameter N = 8;
 module functionalunit(
-memorysubsystem instf,
-input logic instf.rst, 
+memorysubsystem instf, 
 input logic [N-1:0]D, 
 input logic [2:0]S, 
 input logic MSBIn, 

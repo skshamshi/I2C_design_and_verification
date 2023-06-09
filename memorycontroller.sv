@@ -1,5 +1,4 @@
-parameter SLAVE_SIZE=8;
-parameter SLAVE_ADDR=7'b1001100;
+import designparameters::*;
 module memorycontroller(
   memorysubsystem instm, 
   output logic [7:0] data_out
@@ -56,7 +55,7 @@ always_comb begin
     unique case (1'b1)
       state[start_bit]: begin
         //enable <= 1'b1;  
-        if ((scl == 1'b1) && (slavesda == 1'b0)) begin
+        if ((instm.scl == 1'b1) && (instm.slavesda == 1'b0)) begin
             nextstate <= store_state;
 			end
         else begin
@@ -71,7 +70,7 @@ always_comb begin
             i<= i + 1;
             address[i] <= instm.slavesda;
             read <= mem[address[7:1]]; 
-            // instm.ack <= 1'b1; 
+            instm.ack <= 1'b1; 
 			data_out<=instm.data_in;
 			nextstate <= data_state;
         end
@@ -97,7 +96,7 @@ always_comb begin
     end 
          
         state[ack_bit]: begin
-           // instm.ack <= 1'b1;
+           instm.ack <= 1'b1;
            mem[address[7:1]] <= datain;
            nextstate <= stop_state;  	   
     end
@@ -120,15 +119,34 @@ assign instm.slavesda = sda_final;
 //Assertions of memory controller
 //Assertions to check for idle state
 property p_state_idle;
-@(posedge instm.clk)
+@(posedge instm.clk) disable iff(instm.rst)
   (instm.rst) |=> (state==start_state);
 endproperty
-  a_check_start_state:  assert property (p_state_idle) $error("assertion failed at p_state_idle");
+  a_check_idle1_state:  assert property (p_state_idle) $error("assertion failed at p_state_idle");
 // Assertion to check for start state
  property p_state_start;
 @(posedge instm.clk)
-  ((scl == 1'b1) && (slavesda == 1'b0)) |=> ((state==store_state)  || (state==start_state));
+  (((instm.scl == 1'b1) && (instm.slavesda == 1'b0)) && (state==start_state))|=> ((state==store_state) || (state==start_state) );
 endproperty
-  a_check_start_state:  assert property (p_state_idle) $error("assertion failed at p_state_idle");
+  a_check_start1_state:  assert property (p_state_start) $error("assertion failed at p_state_start");
+// Assertion to check in ack state
+property p_state_ack;
+ @(posedge instm.clk)
+    (state==ack_state) |=> (state==stop_state);
+endproperty
+  a_check_ack1_state: assert property (p_state_ack) $error ("assertion failed at p_state_ack");
+//Assertion to check in stop state
+property p_state_stop;
+@(posedge instm.clk)
+   (( (instm.scl == 1'b1)&&(instm.slavesda == 1'b1) ) && (state==stop_state)) |=> ((state==start_state) ||(state==stop_state));
+endproperty
+  a_check_stop1_state: assert property (p_state_stop) $error (" assertion failed at p_state_stop");
+// Assertions to check outputs in idle state
+property p_outputs_ack;
+@(posedge instm.clk)
+  (state==ack_state) |-> ((instm.ack==1'b1) && (mem[address[7:1]] == datain));
+endproperty
+   a_check_outputs_ack : assert property (p_outputs_ack) $error ("assertion failed at p_outputs_ack");
+
  
 endmodule
